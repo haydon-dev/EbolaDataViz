@@ -56,7 +56,7 @@ d3.csv("graph_data.csv", function(err, data){
 			return d.Value;
 		return 0;
 	});
-	var deaths = byDate.group.reduceSum(function(d){
+	var deaths = byDate.group().reduceSum(function(d){
 		if(d.Type === "Deaths")
 			return d.Value;
 		return 0;
@@ -77,6 +77,13 @@ d3.csv("graph_data.csv", function(err, data){
 	var firstDay = byDate.bottom(1)[0].Date;
 	var lastDay = byDate.top(1)[0].Date;
 	
-	
+	d3.json("locations.geojson", function(countriesJSON){
+		
+		//Add Data to graphs
+		//Mortality rate
+		mortality
+			.text(totalDeaths / totalCases);
+		
+	});
 	
 });

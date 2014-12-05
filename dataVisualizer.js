@@ -1,3 +1,5 @@
+var test; //DEBUGGING VARIABLE
+
 //Unit to be used for creating equal/proportional sized graphics
 //	Graphics can be given sizes in terms of BLOCKs (1x2, 2x2, 1x1, etc.)
 //	This way we can scale the graphics up/down easily and in one place
@@ -15,7 +17,7 @@ var casesDeathsBar = body.append("svg")
 	.attr("id", "casesDeathsBar");
 var map = body.append("svg")
 	.attr("width", 3 * BLOCK)
-	.attr("height", 3 * BLOCK)
+	.attr("height", 2 * BLOCK)
 	.attr("id", "map");
 var stackedColumn = body.append("svg")
 	.attr("width", 3 * BLOCK)
@@ -73,16 +75,35 @@ d3.csv("graph_data.csv", function(err, data){
 		return 0;
 	});
 	
+	test = totalDeaths;
+	
 	//Define Date bounds
 	var firstDay = byDate.bottom(1)[0].Date;
 	var lastDay = byDate.top(1)[0].Date;
 	
-	d3.json("locations.geojson", function(countriesJSON){
+	var projection = d3.geo.mercator()
+						.scale(1.25 * BLOCK)
+						.center([-20,25]);
+	var path = d3.geo.path().projection(projection);
+	
+	d3.json("locations.json", function(error, countriesJSON){
 		
 		//Add Data to graphs
-		//Mortality rate
-		mortality
-			.text(totalDeaths / totalCases);
+		
+		//Map of outbreak area
+		map.selectAll('path')
+			.data(countriesJSON.features)
+			.enter().append('path')
+				.attr('d', path)
+				.attr('class','border')
+				.attr('id',function(d){
+					return d.properties.NAME;
+				})
+				.style('fill', function(d){
+					//TODO: find deaths for this country and darken accordingly
+					return '#00F';
+				});
+		
 		
 	});
 	

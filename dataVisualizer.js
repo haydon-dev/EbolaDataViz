@@ -15,6 +15,7 @@ var casesDeathsBar = body.append("svg")
 	.attr("width", 2 * BLOCK)
 	.attr("height", 1 * BLOCK)
 	.attr("id", "casesDeathsBar");
+//This 3:2 ratio fits our affected countries well
 var map = body.append("svg")
 	.attr("width", 3 * BLOCK)
 	.attr("height", 2 * BLOCK)
@@ -29,7 +30,7 @@ var line = body.append("svg")
 	.attr("id", "line");
 
 d3.csv("graph_data.csv", function(err, data){
-
+	
 	var countryNameRange = [];
 	var parseDate = d3.time.format("%m/%_d/%Y").parse;
 	
@@ -75,12 +76,20 @@ d3.csv("graph_data.csv", function(err, data){
 		return 0;
 	});
 	
-	test = totalDeaths;
+	test = {
+		data: data,
+		countries: countries,
+		cnr: countryNameRange,
+		totalCases: totalCases,
+		totalDeaths: totalDeaths
+	};
+	
 	
 	//Define Date bounds
 	var firstDay = byDate.bottom(1)[0].Date;
 	var lastDay = byDate.top(1)[0].Date;
 	
+	//Sets up a path to draw the map
 	var projection = d3.geo.mercator()
 						.scale(1.25 * BLOCK)
 						.center([-20,25]);
@@ -99,9 +108,29 @@ d3.csv("graph_data.csv", function(err, data){
 				.attr('id',function(d){
 					return d.properties.NAME;
 				})
+				//Set fill to a gradient depending on cases
 				.style('fill', function(d){
-					//TODO: find deaths for this country and darken accordingly
-					return '#00F';
+					if(countryNameRange.indexOf(d.properties.NAME) !== -1){
+						var cases;
+						for(var x = 0; x < countries.all().length; x++){
+							if(countries.all()[x].key === d.properties.NAME)
+								cases = countries.all()[x].value;
+						}
+						console.log(d.properties.NAME + " " + cases);
+						if(cases >= 5000)
+							return '#010101';
+						if(cases >= 2000)
+							return '#212121';
+						if(cases >= 500)
+							return '#414141';
+						if(cases >= 100)
+							return '#616161';
+						if(cases > 10)
+							return '#818181';
+						return '#A1A1A1';
+					}
+					//Country is unaffected, draw as default color
+					return '#DDA';
 				});
 		
 		

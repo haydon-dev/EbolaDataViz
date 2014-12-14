@@ -12,7 +12,7 @@ var mortality = body.append("svg")
 	.attr("height", 1 * BLOCK)
 	.attr("id", "mortality");
 var casesDeathsBar = body.append("svg")
-	.attr("width", 2 * BLOCK)
+	.attr("width", 1 * BLOCK)
 	.attr("height", 1 * BLOCK)
 	.attr("id", "casesDeathsBar");
 //This 3:2 ratio fits our affected countries well
@@ -28,6 +28,9 @@ var line = body.append("svg")
 	.attr("width", 3 * BLOCK)
 	.attr("height", 1 * BLOCK)
 	.attr("id", "line");
+	
+	
+var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 d3.csv("graph_data.csv", function(err, data){
 	
@@ -43,6 +46,7 @@ d3.csv("graph_data.csv", function(err, data){
 		}
 	});
 	
+	
 	//Use Crossfilter to group data into better sets
 	var xfilter = crossfilter(data);
 	var allData = xfilter.groupAll();
@@ -51,6 +55,9 @@ d3.csv("graph_data.csv", function(err, data){
 	var byDate = xfilter.dimension(function(d){	return d.Date;	});
 	var byCountry = xfilter.dimension(function(d){	return d.Country;	});
 	var byType = xfilter.dimension(function(d){	return d.Type;	});
+	var byMonth = xfilter.dimension(function(d){
+		return d.Date.toString().substr(4,3);
+	});
 	
 	//Create groups of data for relevant stats
 	var types = byType.group().reduceSum(function(d){	return d.Value;	});
@@ -76,28 +83,109 @@ d3.csv("graph_data.csv", function(err, data){
 		return 0;
 	});
 	
-	test = {
-		data: data,
-		countries: countries,
-		cnr: countryNameRange,
-		totalCases: totalCases,
-		totalDeaths: totalDeaths
-	};
+	var casesAndDeaths = [];
+	var casesByMonth = byMonth.group().reduceSum(function(d){
+		if(d.Type === "Cases"){
+			return d.Value;
+		}
+		return 0;
+	});
+	var deathsByMonth = byMonth.group().reduceSum(function(d){
+		if(d.Type === "Deaths"){
+			return d.Value;
+		}
+		return 0;
+	});
 	
 	
 	//Define Date bounds
 	var firstDay = byDate.bottom(1)[0].Date;
 	var lastDay = byDate.top(1)[0].Date;
 	
+	//Draw cases vs deaths bar
+	var numCases = totalCases.all()[totalCases.all().length-1];
+	var numDeaths = totalDeaths.all()[totalDeaths.all().length-1];
+	var barXScale = d3.scale.ordinal()
+		.domain([numCases.value, numDeaths.value])
+		.rangeRoundBands([0, BLOCK], 0.05);
+	var barYScale = d3.scale.linear()
+		.domain([0, d3.max([numCases.value, numDeaths.value])])
+		.range([0, BLOCK]);
+	function setBars(){
+		var bars = casesDeathsBar.selectAll('rect')
+			.data([numCases.value, numDeaths.value])
+			.enter().append('rect')
+				.attr("class", "bar")
+				.attr("x", function(d,i){
+					//console.log(d + " " + d.value);
+					return barXScale(d);
+				})
+				.attr("y", function(d,i){
+					return BLOCK - barYScale(d);
+				})
+				.attr("width", barXScale.rangeBand())
+				.attr("height", function(d){
+					return barYScale(d);
+				})
+				.attr("fill", function(d,i){
+					if(i < 1)
+						return '#FF3333';
+					else
+						return '#222222';
+				})
+				.append("title")
+				   .text(function(d, i) {
+						if(i >= 1)
+							return "Total Deaths: " + d;
+						else
+							return "Total Cases: " + d;
+				   });
+	}
+	function setText(){
+		casesDeathsBar.selectAll("text")
+		   .data([numCases.value, numDeaths.value])
+		   .enter()
+		   .append("text")
+		   .text(function(d) {
+				return d;
+		   })
+		   .attr("text-anchor", "middle")
+		   .attr("x", function(d, i) {
+				return barXScale(d) + barXScale.rangeBand() / 2;
+		   })
+		   .attr("y", function(d) {
+				return BLOCK - barYScale(d) + 24;
+		   })
+		   .attr("font-family", "'Ropa Sans', sans-serif")
+		   .attr("font-size", "12px")
+		   .attr("fill", function(d,i) {
+				if(i >= 1)
+					return "white";
+				else
+					return "black";
+		   });
+	}
+	setBars();
+	setText();
+	
+	test = {
+		data: data,
+		cases: casesByMonth,
+		countries: countries,
+		cnr: countryNameRange,
+		totalCases: numCases,
+		totalDeaths: numDeaths,
+		xScale: barXScale,
+		yScale: barYScale
+	};
+	
 	//Sets up a path to draw the map
 	var projection = d3.geo.mercator()
 						.scale(1.25 * BLOCK)
 						.center([-20,25]);
-	var path = d3.geo.path().projection(projection);
+	var path = d3.geo.path().projection(projection);	
 	
 	d3.json("locations.json", function(error, countriesJSON){
-		
-		//Add Data to graphs
 		
 		//Map of outbreak area
 		map.selectAll('path')
@@ -105,33 +193,44 @@ d3.csv("graph_data.csv", function(err, data){
 			.enter().append('path')
 				.attr('d', path)
 				.attr('class','border')
-				.attr('id',function(d){
+				/*.attr('id',function(d){
 					return d.properties.NAME;
-				})
+				})*/
 				//Set fill to a gradient depending on cases
-				.style('fill', function(d){
+				.attr('id', function(d){
 					if(countryNameRange.indexOf(d.properties.NAME) !== -1){
 						var cases;
 						for(var x = 0; x < countries.all().length; x++){
 							if(countries.all()[x].key === d.properties.NAME)
 								cases = countries.all()[x].value;
 						}
-						console.log(d.properties.NAME + " " + cases);
+						//console.log(d.properties.NAME + " " + cases);
 						if(cases >= 5000)
-							return '#010101';
+							return 'veryhigh';
 						if(cases >= 2000)
-							return '#212121';
+							return 'high';
 						if(cases >= 500)
-							return '#414141';
+							return 'medium';
 						if(cases >= 100)
-							return '#616161';
+							return 'low';
 						if(cases > 10)
-							return '#818181';
-						return '#A1A1A1';
+							return 'verylow';
+						return 'few';
 					}
 					//Country is unaffected, draw as default color
-					return '#DDA';
-				});
+					return 'none';
+				})
+				.append("title")
+				.text(function(d) {
+					var cases;
+					for(var x = 0; x < countries.all().length; x++){
+						if(countries.all()[x].key === d.properties.NAME)
+							cases = countries.all()[x].value;
+					}
+					if(countryNameRange.indexOf(d.properties.NAME) === -1)
+						cases = 0;
+					 return 'Country: ' + d.properties.NAME + '\nCases: ' + cases;
+			   });
 		
 		
 	});
